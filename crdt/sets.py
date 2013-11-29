@@ -163,3 +163,95 @@ class TwoPSet(SetStateCRDT):
     def discard(self, element):
         if element in self:
             self.R.add(element)
+
+#ORSet implementation by Salessawi Ferede Yitbarek
+class ORSet(SetStateCRDT):
+    def __init__(self):
+        self.E = {}
+        self.T = {}
+
+    def compare(self, other):
+        #TODO: implement
+        pass
+
+
+        pass
+
+    @property
+    def value(self):
+        return set(self.E)
+
+    def add(self, element):
+        #add operation:
+        #E := E U {(e, n)} \ T ,
+        # where n is a unique id
+
+        id = str( uuid.uuid4() )
+        observed = self.E.get(element,set())
+
+        self.E[element] = observed ^ {id}
+
+
+    def discard(self, element):
+        if element in self.E:
+            self.T[element] = self.E[element]
+            del self.E[element]
+
+    @classmethod
+    def merge(cls, X, Y):
+
+        #merge operation:
+        # new.E := (X.E \ Y.T) U (Y.E \ X.T)
+        # new.T := X.T U Y.T
+
+        newSet = ORSet()
+
+        #evaulate (X.E \ Y.T)
+        XE = cls._remove_dead_items(X.E,Y.T)
+
+        #evaluate (Y.E \ X.T)
+        YE = cls._remove_dead_items(Y.E,X.T)
+
+        #union
+        newSet.E= cls._merged_dicts(XE,YE)
+
+
+        # newSet.T := X.T U B.T
+        newSet.T = cls._merged_dicts(X.T,Y.T)
+
+        return newSet
+
+
+    def get_payload(self):
+        return {
+            "E": self.E,
+            "T": self.T,
+            }
+
+    def set_payload(self, payload):
+        self.T = payload['T']
+        self.E = payload['E']
+
+    payload = property(get_payload, set_payload)
+
+
+    @classmethod
+    def _remove_dead_items(cls,e,t):
+        #(e \ t)
+        keys = set(e)
+        newe = {}
+        for key in keys:
+            temp = e[key] - t.get(key, set())
+            if len(temp) > 0:
+                newe[key] =temp
+
+        return  newe
+
+    @classmethod
+    def _merged_dicts(cls, x, y):
+        new = {}
+        keys = set(x) | set(y)
+        for key in keys:
+            new[key] = x.get(key,set()) | y.get(key, set())
+
+        return new
